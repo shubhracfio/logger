@@ -7,6 +7,19 @@ const { Sequelize } = require('sequelize');
 
 var model = require('./ServerLog.model.js');
 
+function haveSameKeys(obj1, obj2) {
+    // Get the keys of both objects
+    const keys1 = _.keys(obj1);
+    const keys2 = _.keys(obj2);
+    
+    // Check if the lengths of the key arrays are the same
+    if (keys1.length !== keys2.length)
+        return false;
+
+    // check if both key arrays are the same
+    return _.isEqual(keys1.sort(), keys2.sort());
+}
+
 module.exports = {
     /**
      * @returns {callback}
@@ -14,7 +27,7 @@ module.exports = {
      * @param {*} res 
      * @param {*} next 
      */
-    getRequestLogger:function(options){
+    getRequestLogger:function(options,modifyLog){
         if(options.pg_connection_string){
             const sequelize = new Sequelize(options.pg_connection_string,{
                 dialect: 'postgres',
@@ -55,7 +68,14 @@ module.exports = {
                     req_user_username: (req.user) ? req.user.username : null,
                     // req_user_details: (req.user) ? req.user : null,
                     req_session_id: req.sessionID,
+                    req_org_id: (req.org) ? req.org.id : null,
                 };
+
+                // Customize log object
+                if (typeof modifyLog === 'function') {
+                    var mLog = modifyLog(req, _.cloneDeep(log))
+                    log = (mLog && typeof mLog === 'object' && haveSameKeys(log,mLog)) ? mLog : log;
+                }
 
                 // remove sensitive information
                 if (log.req_headers.authorization)
